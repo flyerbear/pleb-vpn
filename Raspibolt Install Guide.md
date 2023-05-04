@@ -112,9 +112,11 @@ Install cgroup-tools:
 ```
 sudo apt install cgroup-tools
 ```
-Install nft:
+Install nft and add ip nat table and POSTROUTING chain:
 ```
 sudo apt install nftables
+sudo nft add table ip nat
+nft 'add chain ip nat POSTROUTING {type nat hook postrouting priority 100 ; policy accept; }'
 ```
 Clean rules from failed install attempts:
 ```
@@ -298,4 +300,151 @@ chmod 755 -R /home/admin/pleb-vpn/split-tunnel
 Run it once:
 ```
 sudo /home/admin/pleb-vpn/split-tunnel/nftables-config.sh
+```
+Create nftables-config systemd service...
+```
+echo "[Unit]
+Description=Configure nftables for split-tunnel process
+Requires=pleb-vpn-tor-split-tunnel.service
+After=pleb-vpn-tor-split-tunnel.service
+[Service]
+Type=oneshot
+ExecStart=/bin/bash /home/admin/pleb-vpn/split-tunnel/nftables-config.sh
+[Install]
+WantedBy=multi-user.target
+" | sudo tee /etc/systemd/system/pleb-vpn-nftables-config.service
+```
+[NEED TO ADD STEPS TO ACTUALLY FINISH ACTIVATING]
+
+## Step 5: Install WireGuard for private remote access
+
+Install WireGuard
+```
+sudo apt update
+sudo apt install wireguard
+```
+Generate private key, public key, and write to WireGuard configuration file
+```
+(umask 077 && printf "[Interface]\nPrivateKey = " | sudo tee /etc/wireguard/wg0.conf > /dev/null)
+wg genkey | sudo tee -a /etc/wireguard/wg0.conf | wg pubkey | sudo tee /etc/wireguard/server_public_key
+sudo nano /etc/wireguard/wg0.conf
+```
+The first two lines should already be in your wg0.conf file. Add the rest, taking care to input *your* port (forwarded from your VPS). For address, can enter any private IP address *that is not in your local LAN range* you like.
+```
+[Interface]
+PrivateKey = (generated_private_key)
+ListenPort = 5555
+SaveConfig = true
+Address = 10.0.0.0/24
+
+PostUp = iptables -A FORWARD -i %i -j ACCEPT; iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -t nat -D POSTROUTING -o eth0 -j MASQUERADE
+```
+Generate client keys and config files - can customize names and addresses as you see fit.
+```
+serverPublicKey=$(sudo cat /etc/wireguard/server_public_key)
+sudo wg genkey | sudo tee /etc/wireguard/client1_private_key | wg pubkey > /etc/wireguard/client1_public_key
+client1PrivateKey=$(sudo cat /etc/wireguard/client1_private_key)
+client1PublicKey=$(sudo cat /etc/wireguard/client1_public_key)
+sudo wg genkey | sudo tee /etc/wireguard/client2_private_key | wg pubkey > /etc/wireguard/client2_public_key
+client2PrivateKey=$(sudo cat /etc/wireguard/client2_private_key)
+client2PublicKey=$(sudo cat /etc/wireguard/client2_public_key)
+sudo wg genkey | sudo tee /etc/wireguard/client3_private_key | wg pubkey > /etc/wireguard/client3_public_key
+client3PrivateKey=$(sudo cat /etc/wireguard/client3_private_key)
+client3PublicKey=$(sudo cat /etc/wireguard/client3_public_key)
+wgIP= # enter your desired WireGuard IP address here, from 10.0.0.0 to 10.255.255.255. Must be different from your home LAN.
+wgLAN=$(echo "${wgIP}" | sed 's/^\(.*\)\.\(.*\)\.\(.*\)\.\(.*\)$/\1\.\2\.\3/')
+serverHost=$(echo "${wgIP}" | cut -d "." -f4)
+client1Host=$(expr $serverHost + 1)
+client2Host=$(expr $serverHost + 2)
+client3Host=$(expr $serverHost + 3)
+client1ip=$(echo "${wgLAN}.${client1Host}")
+client2ip=$(echo "${wgLAN}.${client2Host}")
+client3ip=$(echo "${wgLAN}.${client3Host}")
+
+echo "[Peer]
+PublicKey = ${client1PublicKey}
+AllowedIPs = ${client1ip}/32
+
+[Peer]
+PublicKey = ${client2PublicKey}
+AllowedIPs = ${client2ip}/32
+
+[Peer]
+PublicKey = ${client3PublicKey}
+AllowedIPs = ${client3ip}/32
+" >> /etc/wireguard/wg0.conf
+
+sudo mkdir /etc/wireguard/clients
+
+echo "[Interface]
+Address = ${client1ip}/32
+PrivateKey = ${client1PrivateKey}
+
+[Peer]
+PublicKey = ${serverPublicKey}
+Endpoint = ${vpnIP}:${wgPort}
+AllowedIPs = ${wgLAN}.0/24, ${LAN}.0/24
+" | sudo tee /etc/wireguard/clients/mobile.conf
+    echo "[Interface]
+Address = ${client2ip}/32
+PrivateKey = ${client2PrivateKey}
+
+[Peer]
+PublicKey = ${serverPublicKey}
+Endpoint = ${vpnIP}:${wgPort}
+AllowedIPs = ${wgLAN}.0/24, ${LAN}.0/24
+" | sudo tee /etc/wireguard/clients/laptop.conf
+    echo "[Interface]
+Address = ${client3ip}/32
+PrivateKey = ${client3PrivateKey}
+
+[Peer]
+PublicKey = ${serverPublicKey}
+Endpoint = ${vpnIP}:${wgPort}
+AllowedIPs = ${wgLAN}.0/24, ${LAN}.0/24
+" | sudo tee /etc/wireguard/clients/desktop.conf
+```
+Open firewall ports
+```
+sudo ufw allow ${wgPort}/udp comment "wireguard port"
+sudo ufw allow out on wg0 from any to any
+sudo ufw allow in on wg0 from any to any
+sudo ufw allow in to ${wgLAN}.0/24
+sudo ufw allow out to ${wgLAN}.0/24
+```
+Enable ip forward
+```
+sudo sed -i '/net.ipv4.ip_forward/ s/#//' /etc/sysctl.conf
+```
+Enable systemd and fix permissions
+```
+sudo systemctl enable wg-quick@wg0
+sudo systemctl start wg-quick@wg0
+```
+Wait 10 seconds, then start wireguard
+```
+sleep 10
+sudo systemctl restart wg-quick@wg0
+```
+If running LND, add tlsextraip and refersh certs:
+```
+sudo nano /data/lnd/lnd.conf
+```
+Add the following line under "[Application Options]". Be careful to add your node's WireGuard IP.
+```
+tlsextraip=<node wgIP>
+```
+Save and exit. Then:
+```
+sudo rm /mnt/hdd/lnd/*.old # deletes existing old certs if you've already done this once.
+sudo mv /mnt/hdd/lnd/tls.cert /mnt/hdd/lnd/tls.cert.old
+sudo mv /mnt/hdd/lnd/tls.key /mnt/hdd/lnd/tls.key.old
+
+sudo systemctl restart lnd
+```
+If wallet not set to auto-unlock, unlock wallet, then restart nginx:
+```
+lncli unlock
+sudo systemctl restart nginx
 ```
