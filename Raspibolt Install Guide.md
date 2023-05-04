@@ -318,6 +318,9 @@ WantedBy=multi-user.target
 
 ## Step 5: Install WireGuard for private remote access
 
+*This step mimics the actions of `vpn-install.sh` in pleb-vpn.*
+*This is by far the hardest and most complex part of setting up pleb-vpn. Take it slow and execute each command carefully.*
+
 Install WireGuard
 ```
 sudo apt update
