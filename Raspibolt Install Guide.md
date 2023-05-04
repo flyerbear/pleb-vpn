@@ -120,7 +120,7 @@ Install nft and add ip nat table and POSTROUTING chain:
 ```
 sudo apt install nftables
 sudo nft add table ip nat
-nft 'add chain ip nat POSTROUTING {type nat hook postrouting priority 100 ; policy accept; }'
+nft 'add chain ip nat POSTROUTING {type nat hook postrouting priority -100 ; policy accept; }'
 ```
 Clean rules from failed install attempts:
 ```
