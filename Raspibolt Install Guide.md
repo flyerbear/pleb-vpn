@@ -186,7 +186,7 @@ curl https://api.ipify.org
 ```
 The resulting IP address should again be your VPS IP. If not, or if curl returned something with the VPN disabled, something went wrong.
 
-## Steps 3-X can be customized to only install the additional features you want, and can be done in any order you desire.
+## Steps 3-6 can be customized to only install the additional features you want, and can be done in any order you desire.
 
 ## Step 3: Enable LND TOR/Clearnet Hybrid Mode
 
@@ -572,3 +572,7 @@ If wallet not set to auto-unlock, unlock wallet, then restart nginx:
 lncli unlock
 sudo systemctl restart nginx
 ```
+
+## Step 6: Set up LetsEncrypt certificates for BTCPayServer and/or LNBits
+
+[TODO: Complete]
