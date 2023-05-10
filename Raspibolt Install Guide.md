@@ -3,9 +3,13 @@ _Manual Installation/Setup for Custom Nodes, Raspibolt, Minibolt, etc..._
 
 ## Step 1: Configure Virtual Private Server (VPS)
 
-Can obtain pleb-vpn.conf file from @allyourbankarebelongtous (easy) or configure your own VPS following the steps below.
+Can obtain pleb-vpn.conf file from @allyourbankarebelongtous (easy), another pleb running their own VPS, or configure your own following the steps below.
 
-[TODO: Add manual VPS setup steps.]
+*Manual VPS setup*
+
+The first thing you need to do is spin up a VPS. This can be done with any cloud vendor that lets you install and manage your OS directly: Amazon Web Services (AWS), Google Cloud Platform (GCP), Linode, Digital Ocean, etc... It doesn't need to be very powerful, and you can even use the free tier on AWS for a year (t2.micro) or GCP forever (e2.micro following https://dev.to/phocks/how-to-get-a-free-google-server-forever-1fpf). Once you have the VPS procured, install your preferred flavor of linux, though Debian or Ubuntu will work best with the commands in this guide. You will also need to follow the instructions for your VPS provider to open ports 22, 80, 443, 1194, 9735 (lnd) or 9736 (cln), 9993, and possibly others depending on what services you activate below. When that is done, log in and proceed with setup.
+
+
 
 ## Step 2: Install and configure OpenVPN on node.
 
