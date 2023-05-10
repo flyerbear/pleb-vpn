@@ -9,20 +9,134 @@ Can obtain pleb-vpn.conf file from @allyourbankarebelongtous (easy), another ple
 
 The first thing you need to do is spin up a VPS. This can be done with any cloud vendor that lets you install and manage your OS directly: Amazon Web Services (AWS), Google Cloud Platform (GCP), Linode, Digital Ocean, etc... It doesn't need to be very powerful, and you can even use the free tier on AWS for a year (t2.micro) or GCP forever (e2.micro following https://dev.to/phocks/how-to-get-a-free-google-server-forever-1fpf). Once you have the VPS procured, install your preferred flavor of linux, though Debian or Ubuntu will work best with the commands in this guide. You will also need to follow the instructions for your VPS provider to open ports 22, 80, 443, 1194, 9735 (lnd) or 9736 (cln), 9993, and possibly others depending on what services you activate below. When that is done, log in and proceed with setup.
 
+First, update apt packages:
+```
+sudo apt update
+sudo apt upgrade
+```
+Now create a user 'pivpn', create a password for them, and add them to the sudo group:
+```
+sudo adduser pivpn
+sudo usermod -aG sudo pivpn
+```
+Configure the firewall:
+```
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+sudo ufw default allow routed
+sudo ufw allow ssh
+sudo ufw allow 443
+sudo ufw allow 1194/udp comment 'OpenVPN'
+sudo ufw enable
+```
+Edit `/etc/sysctl.conf` to enable ip forwards.
+```
+sudo nano /etc/sysctl.conf
+```
+Uncomment the following line, then save and exit:
+```
+net.ipv4.ip_forward=1
+```
+Add fail2ban for additional hardening:
+```
+sudo apt install fail2ban
+```
+Install pivpn. Use user `pivpn`, choose `openvpn`, and accept all defaults. You can learn more about this and what it's doing here: https://pivpn.io
+```
+curl -L https://install.pivpn.io | bash
+```
+Check to see if nftables is installed:
+```
+nft --version
+```
+If not installed, install via:
+```
+sudo apt install nftables
+```
+Get the OpenVPN cert for plebvpn. Enter a name for the client (your node) when prompted.
+```
+sudo pivpn add nopass
+```
+Get the virtual IP address. For "clientname", use the name you chose in the previous step.
+```
+cd /etc/openvpn/ccd
+sudo cat "clientname"
+```
+The virtual IP address is the first IP after the name of the client. Write this down or copy it to a text editor as you will need it for future steps.
 
+Get the VPS internet controller:
+```
+ip route | grep default
+```
+This will output a line that looks like the following. In this example, `eth0` is what we're looking for.
+```
+default via 68.183.112.1 dev eth0 proto static ...
+```
+Now you need to forward ports coming into your VPS to your node via the VPN. If you want to learn more about what this is doing, check out https://jensd.be/1086/linux/forward-a-tcp-port-to-another-ip-or-port-using-nat-with-nftables. In all lines below, replace vip.ip.ip.ip with the virtual ip of your client from before, and `eth0` with your internet controller from the previous step.
+Set up the table and chains we will use to port forward:
+```
+sudo nft add table nat
+sudo nft 'add chain nat postrouting { type nat hook postrouting priority 100 ; }'
+sudo nft 'add chain nat prerouting { type nat hook prerouting priority -100; }'
+```
+
+Forward port 9735 for lnd:
+```
+sudo nft add rule ip nat prerouting iifname "eth0" tcp dport 9735 counter dnat to vip.ip.ip.ip:9735
+sudo nft add rule ip nat prerouting iifname "eth0" udp dport 9735 counter dnat to vip.ip.ip.ip:9735
+```
+Forward port 9736 for cln:
+```
+sudo nft add rule ip nat prerouting iifname "eth0" tcp dport 9736 counter dnat to vip.ip.ip.ip:9736
+sudo nft add rule ip nat prerouting iifname "eth0" udp dport 9736 counter dnat to vip.ip.ip.ip:9736
+```
+Forward port 9993 for wireguard:
+```
+sudo nft add rule ip nat prerouting iifname "eth0" tcp dport 9993 counter dnat to vip.ip.ip.ip:9993
+sudo nft add rule ip nat prerouting iifname "eth0" udp dport 9993 counter dnat to vip.ip.ip.ip:9993
+```
+Forward port 443 to 5001 for LNBits. If you want to use BTCPayServer instead, skip these lines and execute the ones below. If you want to be able to forward to both, you need to set up nginx on your VPS and it's a bit more complicated but can be done.
+```
+sudo nft add rule ip nat prerouting iifname "eth0" tcp dport 443 counter dnat to vip.ip.ip.ip:5001
+sudo nft add rule ip nat prerouting iifname "eth0" udp dport 443 counter dnat to vip.ip.ip.ip:5001
+```
+Forward port 443 to 23001 for BTCPayServer. Can't be done at the same time as LNBits above - you have to use nginx to configure both simultaneously.
+```
+sudo nft add rule ip nat prerouting iifname "eth0" tcp dport 443 counter dnat to vip.ip.ip.ip:23001
+sudo nft add rule ip nat prerouting iifname "eth0" udp dport 443 counter dnat to vip.ip.ip.ip:23001
+```
+Adjust postrouting masquerade so all packets appear to be coming from the VPS:
+```
+nft add rule ip nat postrouting oifname "tun0" ip daddr vip.ip.ip.ip/24 counter masquerade
+```
+Now that we've added all of these rules, we need to make them permanent, so they will be re-enabled on restart.
+```
+sudo cp /etc/nftables.conf /etc/nftables.backup
+sudo nft list ruleset | sudo tee /etc/nftables.conf
+sudo systemctl enable nftables
+```
+Now you can logout of the VPS and download the configuration file to your laptop.
+```
+logout
+```
+On your home computer/laptop, execute the following command. If you want to save the file in a particular folder, navigate to that folder with `cd`, then execute the `scp` command. Don't forget the `.`!
+```
+scp -r root@vpsip.ip.ip.ip:/home/pivpn/ovpns .
+```
+You should have a directory on your home computer where you executed the previous command called `ovpns`. Rename the clientname.ovpn file in that folder to `plebvpn.conf`. You will upload this to your node in step 2.
 
 ## Step 2: Install and configure OpenVPN on node.
 
 *This step mimics the actions of `vpn-install.sh` in pleb-vpn.*
 
+First, before connecting to your node via ssh, upload the `plebvpn.conf` file you got from @allyourbankarebelongtous or that you created yourself to your node. To work as written, you must be in the same folder as where you saved the `plebvpn.conf` file.
+```
+scp plebvpn.conf admin@your.node.ip.ip:/home/admin/
+```
+SSH into your node, then...
 Install OpenVPN
 ```
 sudo apt install openvpn
-```
-Upload openvpn config file and rename to plebvpn.conf
-```
-[Add code]
-sudo mv [yournode].ovpn plebvpn.conf
 ```
 Move openvpn config file and fix ownership/permissions
 ```
