@@ -292,14 +292,23 @@ sudo nano /etc/systemd/system/pleb-vpn-create-cgroup.service
 ```
 Fill with:
 ```
-
+[Unit]
+Description=Creates cgroup for split-tunneling tor from vpn
+StartLimitInterval=200
+StartLimitBurst=5
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/bash /home/admin/pleb-vpn/split-tunnel/create-cgroup.sh
+[Install]
+WantedBy=multi-user.target
 ```
 Add pleb-vpn-create-cgroup.service as a requirement to start tor:
 ```
 sudo mkdir /etc/systemd/system/tor@default.service.d
 sudo nano /etc/systemd/system/tor@default.service.d/tor-cgroup.conf
 ```
-Fill with:
+Fill with the following, then save and exit.
 ```
 #Don't edit this file, it is created by pleb-vpn split-tunnel
 [Unit]
@@ -423,7 +432,87 @@ ExecStart=/bin/bash /home/admin/pleb-vpn/split-tunnel/nftables-config.sh
 WantedBy=multi-user.target
 " | sudo tee /etc/systemd/system/pleb-vpn-nftables-config.service
 ```
-[NEED TO ADD STEPS TO ACTUALLY FINISH ACTIVATING]
+Now enable all services:
+```
+sudo systemctl daemon-reload
+sudo systemctl enable pleb-vpn-create-cgroup.service
+sudo systemctl enable pleb-vpn-tor-split-tunnel.service
+sudo systemctl enable pleb-vpn-nftables-config.service
+sudo systemctl enable pleb-vpn-tor-split-tunnel.timer
+```
+Restart tor to pick up new split-tunnel configuration:
+```
+sudo systemctl stop tor@default.service
+sudo systemctl start pleb-vpn-create-cgroup.service
+sudo systemctl start tor@default.service
+sudo systemctl start pleb-vpn-tor-split-tunnel.service
+sudo systemctl start pleb-vpn-nftables-config.service
+sudo systemctl start pleb-vpn-tor-split-tunnel.timer
+```
+If you want to be able to test your split-tunneling configuration, create a test script in user `admin`'s home directory as follows:
+```
+cd ~
+nano split-tunnel-test.sh
+```
+Fill with the following, then save and exit.
+```
+#!/bin/bash
+
+  # check configuration
+  echo "OK...tor is configured. Wait 2 minutes for tor to start..."
+  sleep 60
+  echo "wait 1 minute for tor to start..."
+  sleep 60
+  echo "checking configuration"
+  echo "stop vpn"
+  systemctl stop openvpn@plebvpn
+  echo "vpn stopped"
+  echo "checking firewall"
+  currentIP=$(curl https://api.ipify.org)
+  echo "current IP = (${currentIP})...should be blank"
+  if [ "${currentIP}" = "" ]; then
+    echo "firewall config ok"
+  else
+    echo "error...firewall not configured. Clearnet accessible when VPN is off. Re-attempt pleb-vpn install steps, especially firewall configuration."
+    systemctl start openvpn@plebvpn
+    exit 1
+  fi
+  echo "Checking connection over tor with VPN off (takes some time, likely multiple tries)..."
+  echo "Will attempt a connection up to 10 times before giving up..."
+  inc=1
+  while [ $inc -le 10 ]
+  do
+    echo "attempt number ${inc}"
+    torIP=$(torify curl http://api.ipify.org)
+    echo "tor IP = (${torIP})...should not be blank, should not be your home IP, and should not be your VPS IP."
+    if [ ! "${torIP}" = "" ]; then
+      inc=11
+    else
+      ((inc++))
+    fi
+  done
+  if [ ! "${torIP}" = "" ]; then
+    echo "tor split-tunnel successful"
+  else
+    echo "error...unable to connect over tor when VPN is down. It's possible that it needs more time to establish a connection. Try checking the status using STATUS menu later. If unable to connect, re-attempt tor split-tunneling install instructions."
+  fi
+  sleep 2
+  echo "restarting vpn"
+  systemctl start openvpn@plebvpn
+  sleep 2
+  echo "checking vpn IP"
+  currentIP=$(curl https://api.ipify.org)
+  echo "current IP = (${currentIP})...should be your VPS IP address"
+  echo "tor split-tunneling enabled!"
+  sleep 2
+```
+Make it executable:
+```
+sudo chmod +x split-tunnel-test.sh
+```
+To test your VPN and split-tunnel configuration, run the script with `sudo bash split-tunnel-test.sh`. This will first test your firewall settings by stopping your openvpn VPN, then try to check your IP address using `curl https://api.ipify.org`. It should timeout without a connection and show a blank IP. Then it will try to check your IP using the same command, but with `torify` to go over tor. It should return an IP different from your home IP, and different from your VPS IP, but should not be blank. This step can take several times to succeed due to the nature of tor. The script will try up to 10 times. Finally, it will re-enable your openvpn VPN and try the `curl` command one more time. This time, it should return the IP address of your VPS.
+
+Congratulations, you have successfully configured your node with clearnet/tor hybrid connectivity and split-tunneling of tor traffic!
 
 ## Step 5: Install WireGuard for private remote access
 
