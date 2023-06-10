@@ -73,47 +73,34 @@ This will output a line that looks like the following. In this example, `eth0` i
 default via 68.183.112.1 dev eth0 proto static ...
 ```
 Now you need to forward ports coming into your VPS to your node via the VPN. If you want to learn more about what this is doing, check out https://jensd.be/1086/linux/forward-a-tcp-port-to-another-ip-or-port-using-nat-with-nftables. In all lines below, replace vip.ip.ip.ip with the virtual ip of your client from before, and `eth0` with your internet controller from the previous step.
-Set up the table and chains we will use to port forward:
-```
-sudo nft add table nat
-sudo nft 'add chain nat postrouting { type nat hook postrouting priority 100 ; }'
-sudo nft 'add chain nat prerouting { type nat hook prerouting priority -100; }'
-```
+There should be a way to do this with nftables commands, but I have had issues getting them to forward properly, so we are going to use the legacy iptables commands. These *should* still get automatically interpreted and set as nftables rules.
 
 Forward port 9735 for lnd:
 ```
-sudo nft add rule ip nat prerouting iifname "eth0" tcp dport 9735 counter dnat to vip.ip.ip.ip:9735
-sudo nft add rule ip nat prerouting iifname "eth0" udp dport 9735 counter dnat to vip.ip.ip.ip:9735
+sudo iptables -A PREROUTING -t nat -i eth0 -p tcp -m tcp --dport 9735 -j DNAT --to vip.ip.ip.ip:9735
+sudo iptables -A PREROUTING -t nat -i eth0 -p udp -m udp --dport 9735 -j DNAT --to vip.ip.ip.ip:9735
 ```
 Forward port 9736 for cln:
 ```
-sudo nft add rule ip nat prerouting iifname "eth0" tcp dport 9736 counter dnat to vip.ip.ip.ip:9736
-sudo nft add rule ip nat prerouting iifname "eth0" udp dport 9736 counter dnat to vip.ip.ip.ip:9736
+sudo iptables -A PREROUTING -t nat -i eth0 -p tcp -m tcp --dport 9736 -j DNAT --to vip.ip.ip.ip:9736
+sudo iptables -A PREROUTING -t nat -i eth0 -p udp -m udp --dport 9736 -j DNAT --to vip.ip.ip.ip:9736
 ```
 Forward port 9993 for wireguard:
 ```
-sudo nft add rule ip nat prerouting iifname "eth0" tcp dport 9993 counter dnat to vip.ip.ip.ip:9993
-sudo nft add rule ip nat prerouting iifname "eth0" udp dport 9993 counter dnat to vip.ip.ip.ip:9993
+sudo iptables -A PREROUTING -t nat -i eth0 -p tcp -m tcp --dport 9993 -j DNAT --to vip.ip.ip.ip:9993
+sudo iptables -A PREROUTING -t nat -i eth0 -p udp -m udp --dport 9993 -j DNAT --to vip.ip.ip.ip:9993
 ```
 Forward port 443 to 5001 for LNBits. If you want to use BTCPayServer instead, skip these lines and execute the ones below. If you want to be able to forward to both, you need to set up nginx on your VPS and it's a bit more complicated but can be done.
 ```
-sudo nft add rule ip nat prerouting iifname "eth0" tcp dport 443 counter dnat to vip.ip.ip.ip:5001
-sudo nft add rule ip nat prerouting iifname "eth0" udp dport 443 counter dnat to vip.ip.ip.ip:5001
+sudo iptables -A PREROUTING -t nat -i eth0 -p tcp -m tcp --dport 443 -j DNAT --to vip.ip.ip.ip:5001
 ```
 Forward port 443 to 23001 for BTCPayServer. Can't be done at the same time as LNBits above - you have to use nginx to configure both simultaneously.
 ```
-sudo nft add rule ip nat prerouting iifname "eth0" tcp dport 443 counter dnat to vip.ip.ip.ip:23001
-sudo nft add rule ip nat prerouting iifname "eth0" udp dport 443 counter dnat to vip.ip.ip.ip:23001
+sudo iptables -A PREROUTING -t nat -i eth0 -p tcp -m tcp --dport 443 -j DNAT --to vip.ip.ip.ip:23001
 ```
 Adjust postrouting masquerade so all packets appear to be coming from the VPS:
 ```
-nft add rule ip nat postrouting oifname "tun0" ip daddr vip.ip.ip.ip/24 counter masquerade
-```
-Now that we've added all of these rules, we need to make them permanent, so they will be re-enabled on restart.
-```
-sudo cp /etc/nftables.conf /etc/nftables.backup
-sudo nft list ruleset | sudo tee /etc/nftables.conf
-sudo systemctl enable nftables
+sudo iptables -t nat -A POSTROUTING -d 10.128.196.0/24 -o tun0 -j MASQUERADE
 ```
 Now you can logout of the VPS and download the configuration file to your laptop.
 ```
