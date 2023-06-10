@@ -3,7 +3,7 @@ _Manual Installation/Setup for Custom Nodes, Raspibolt, Minibolt, etc..._
 
 ## Step 1: Configure Virtual Private Server (VPS)
 
-Can obtain pleb-vpn.conf file from @allyourbankarebelongtous (easy), another pleb running their own VPS, or configure your own following the steps below.
+Can obtain pleb-vpn.conf file from @allyourbankarebelongtous (easy), another pleb running their own VPS, or configure your own following the steps below (advanced).
 
 *Manual VPS setup*
 
