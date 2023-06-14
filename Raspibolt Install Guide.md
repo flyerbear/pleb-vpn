@@ -100,7 +100,7 @@ sudo iptables -A PREROUTING -t nat -i eth0 -p tcp -m tcp --dport 443 -j DNAT --t
 ```
 Adjust postrouting masquerade so all packets appear to be coming from the VPS:
 ```
-sudo iptables -t nat -A POSTROUTING -d 10.128.196.0/24 -o tun0 -j MASQUERADE
+sudo iptables -t nat -A POSTROUTING -d vip.ip.ip.0/24 -o tun0 -j MASQUERADE
 ```
 Now you can logout of the VPS and download the configuration file to your laptop.
 ```
