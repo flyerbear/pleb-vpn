@@ -147,13 +147,13 @@ Configure your firewall:
 # disable firewall 
 sudo ufw disable
 # allow local lan ssh
-sudo ufw allow in to ${LAN}.0/24
-sudo ufw allow out to ${LAN}.0/24
+sudo ufw allow in to lanip.ip.ip.0/24
+sudo ufw allow out to lanip.ip.ip.0/24
 # set default policy (killswitch)
 sudo ufw default deny outgoing
 sudo ufw default deny incoming
 # allow out on openvpn
-sudo ufw allow out to ${vpnIP} port ${vpnPort} proto udp
+sudo ufw allow out to vpsip.ip.ip.ip port <vps port> proto udp
 # force traffic to use openvpn
 sudo ufw allow out on tun0 from any to any
 sudo ufw allow in on tun0 from any to any
