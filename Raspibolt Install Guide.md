@@ -1,4 +1,3 @@
-
 _Manual Installation/Setup for Custom Nodes, Raspibolt, Minibolt, etc..._
 
 ## Step 1: Configure Virtual Private Server (VPS)
@@ -7,7 +6,7 @@ Can obtain pleb-vpn.conf file from @allyourbankarebelongtous (easy), another ple
 
 *Manual VPS setup*
 
-The first thing you need to do is spin up a VPS. This can be done with any cloud vendor that lets you install and manage your OS directly: Amazon Web Services (AWS), Google Cloud Platform (GCP), Linode, Digital Ocean, etc... It doesn't need to be very powerful, and you can even use the free tier on AWS for a year (t2.micro) or GCP forever (e2.micro following https://dev.to/phocks/how-to-get-a-free-google-server-forever-1fpf). If you are just running a single node off of it, the smallest size available on your vendor will probably be sufficient. If you want to run a BTCPayServer instance for a large store doing a lot of business, or offer it up for other plebs to use for their nodes too, you may need a larger instance but you can scale up when the need arises. Once you have the VPS procured, install your preferred flavor of linux, though Debian or Ubuntu will work best with the commands in this guide. You will also need to follow the instructions for your VPS provider to open ports 22, 80, 443, 1194, 9735 (lnd) or 9736 (cln), 9993, and possibly others depending on what services you activate below. When that is done, log in and proceed with setup.
+The first thing you need to do is spin up a VPS. This can be done with any cloud vendor that lets you install and manage your OS directly: Amazon Web Services (AWS), Google Cloud Platform (GCP), Linode, Digital Ocean, etc... It doesn't need to be very powerful, and you can even use the free tier on AWS for a year (t2.micro) or GCP forever (e2.micro following https://dev.to/phocks/how-to-get-a-free-google-server-forever-1fpf). If you are just running a single node off of it, the smallest size available on your vendor will probably be sufficient. If you want to run a BTCPayServer instance for a large store doing a lot of business, or offer it up for other plebs to use for their nodes too, you may need a larger instance but you can scale up when the need arises. Once you have the VPS procured, install your preferred flavor of linux, though Debian or Ubuntu will work best with the commands in this guide. You will also need to follow the instructions for your VPS provider to open ports 22, 80, and 443 for TCP, port 1194 for UDP, and ports 9735 (lnd) or 9736 (cln) and 9993 for both TCP and UDP, and possibly others depending on what services you activate below. When that is done, log in and proceed with setup.
 
 First, update apt packages:
 ```
@@ -106,7 +105,7 @@ Now you can logout of the VPS and download the configuration file to your laptop
 ```
 logout
 ```
-On your home computer/laptop, execute the following command. If you want to save the file in a particular folder, navigate to that folder with `cd`, then execute the `scp` command. Don't forget the `.`!
+On your home computer/laptop, execute the following command. If you want to save the file in a particular folder, navigate to that folder with `cd`, then execute the `scp` command. Don't forget the `.`! Note that this is the real IP address of your VPS, not the virtual IP address of your client used in the previous steps.
 ```
 scp -r root@vpsip.ip.ip.ip:/home/pivpn/ovpns .
 ```
@@ -127,7 +126,7 @@ sudo apt install openvpn
 ```
 Move openvpn config file and fix ownership/permissions
 ```
-mv ~/plebvpn.conf /etc/openvpn
+sudo mv ~/plebvpn.conf /etc/openvpn
 sudo chown admin:admin /etc/openvpn/plebvpn.conf
 sudo chmod 640 /etc/openvpn/plebvpn.conf
 ```
