@@ -649,5 +649,24 @@ sudo systemctl restart nginx
 ```
 
 ## Step 6: Set up LetsEncrypt certificates for BTCPayServer and/or LNBits
+*This step mimics the actions of `letsencrypt.install.sh` in pleb-vpn.*
 
+Before going through this step, make sure you:
+1) Have a domain name for each service you are attempting to secure
+2) Have forwarded port 443 from your VPS (or had your VPS provider do it)
+3) Have updated the A record of each domain to ${vpnip}
+4) Are ready to update the CNAME record for each domain when instructed
+
+Install cerbot
+```
+sudo apt install certbot
+```
+Download the acme-dns-auth python script and move to the letsencrypt folder
+```
+sudo mkdir /data/app-data/pleb-vpn/letsencrypt
+wget https://github.com/joohoi/acme-dns-certbot-joohoi/raw/master/acme-dns-auth.py
+mv acme-dns-auth.py /data/app-data/pleb-vpn/letsencrypt
+sudo cp /data/app-data/pleb-vpn/letsencrypt/acme-dns-auth.py /etc/letsencrypt/
+sudo chmod 755 /etc/letsencrypt/acme-dns-auth.py
+```
 [TODO: Complete]
