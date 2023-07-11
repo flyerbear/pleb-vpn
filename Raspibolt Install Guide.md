@@ -665,8 +665,23 @@ Download the acme-dns-auth python script and move to the letsencrypt folder
 ```
 sudo mkdir /data/app-data/pleb-vpn/letsencrypt
 wget https://github.com/joohoi/acme-dns-certbot-joohoi/raw/master/acme-dns-auth.py
-mv acme-dns-auth.py /data/app-data/pleb-vpn/letsencrypt
+sudo mv acme-dns-auth.py /data/app-data/pleb-vpn/letsencrypt
 sudo cp /data/app-data/pleb-vpn/letsencrypt/acme-dns-auth.py /etc/letsencrypt/
 sudo chmod 755 /etc/letsencrypt/acme-dns-auth.py
+```
+Clean up failed/old installs
+```
+sudo rm -rf /etc/letsencrypt/accounts &> /dev/null
+sudo rm /etc/letsencrypt/acmedns.json &> /dev/null
+sudo rm -rf /etc/letsencrypt/archive &> /dev/null
+sudo rm -rf /etc/letsencrypt/csr &> /dev/null
+sudo rm -rf /etc/letsencrypt/keys &> /dev/null
+sudo rm -rf /etc/letsencrypt/live &> /dev/null
+sudo rm -rf /etc/letsencrypt/renew* &> /dev/null
+```
+Set variables for certbot. Do this for however many domains you want to set up. If just btcpay, omit the lnbits line. If just lnbits, set `letsencryptDomain1` to your lnbits domain. Don't forget to replace `mydomain.com` with your domain, and feel free to make the subdomains whatever you like.
+```
+letsencryptDomain1="btcpay.mydomain.com"
+letsencryptDomain2="lnbits.mydomain.com"
 ```
 [TODO: Complete]
